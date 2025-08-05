@@ -1,0 +1,68 @@
+## **Query 1: Monthly Sales Performance with Previous Month Comparison**
+
+### Business Question Addressed
+*"How are monthly sales performing compared to previous months?"*
+
+### Current Query Strengths
+- ✅ Excellent use of `LAG()` function for period-over-period comparison
+- ✅ Proper handling of NULL values in growth calculations
+- ✅ Clear business logic with profit margin calculations
+- ✅ Well-structured comments explaining business purpose
+
+### Enhancement Suggestions
+```sql
+-- Enhanced Query 1: Monthly Sales Performance with Advanced Analytics
+-- Business Question: How are monthly sales performing with seasonal and trend analysis?
+
+SELECT 
+    -- Extract time dimensions for analysis
+    dd.year,
+    dd.month,
+    dd.month_name,
+    -- Calculate total sales and profit metrics
+    SUM(fs.sales) AS monthly_sales,
+    SUM(fs.profit) AS monthly_profit,
+    COUNT(DISTINCT fs.order_id) AS order_count,
+    
+    -- Use LAG to get previous month's sales for comparison
+    LAG(SUM(fs.sales), 1) OVER (ORDER BY dd.year, dd.month) AS prev_month_sales,
+    
+    -- Calculate month-over-month growth as percentage
+    CASE 
+        WHEN LAG(SUM(fs.sales), 1) OVER (ORDER BY dd.year, dd.month) IS NULL THEN NULL
+        WHEN LAG(SUM(fs.sales), 1) OVER (ORDER BY dd.year, dd.month) = 0 THEN NULL
+        ELSE ROUND(((SUM(fs.sales) - LAG(SUM(fs.sales), 1) OVER (ORDER BY dd.year, dd.month)) / 
+               LAG(SUM(fs.sales), 1) OVER (ORDER BY dd.year, dd.month)) * 100, 2)
+    END AS sales_growth_percent,
+    
+    -- Calculate profit margin
+    ROUND((SUM(fs.profit) / SUM(fs.sales)) * 100, 2) AS profit_margin_percent,
+    
+    -- Add 3-month moving average for trend analysis
+    ROUND(AVG(SUM(fs.sales)) OVER (
+        ORDER BY dd.year, dd.month 
+        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ), 2) AS sales_3month_moving_avg,
+    
+    -- Compare with same month previous year (seasonal analysis)
+    LAG(SUM(fs.sales), 12) OVER (ORDER BY dd.year, dd.month) AS same_month_prev_year,
+    
+    -- Year-over-year growth calculation
+    CASE 
+        WHEN LAG(SUM(fs.sales), 12) OVER (ORDER BY dd.year, dd.month) IS NULL THEN NULL
+        WHEN LAG(SUM(fs.sales), 12) OVER (ORDER BY dd.year, dd.month) = 0 THEN NULL
+        ELSE ROUND(((SUM(fs.sales) - LAG(SUM(fs.sales), 12) OVER (ORDER BY dd.year, dd.month)) / 
+               LAG(SUM(fs.sales), 12) OVER (ORDER BY dd.year, dd.month)) * 100, 2)
+    END AS yoy_growth_percent
+    
+FROM 
+    fact_sales fs
+JOIN 
+    dim_date dd ON fs.date_key = dd.date_key
+WHERE 
+    dd.year IN (2019, 2020)
+GROUP BY 
+    dd.year, dd.month, dd.month_name
+ORDER BY 
+    dd.year, dd.month;
+```
